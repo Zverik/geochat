@@ -1,8 +1,8 @@
 <? // GeoChat for OpenStreetMap
 
-const RADIUS = 20; // visibility radius in km
-const AGE = 6; // how long in hours keep messages
-const USER_AGE = 2; // how long in hours keep users
+const RADIUS = 30; // visibility radius in km
+const AGE = 5; // how long in hours keep messages
+const USER_AGE = 1; // how long in hours keep users
 
 $db = new mysqli('localhost', 'zverik', '', 'geochat');
 if( $db->connect_errno )
@@ -34,6 +34,8 @@ if( $action == 'get' || $action == 'post' || $action == 'register' ) {
 } elseif( $action == 'now' ) {
     $now = request_one($db, 'select now()');
     print json_encode(array('date' => $now));
+} elseif( $action == 'last' ) {
+    get_last($db);
 } else {
 //    header('Content-type: text/html; charset=utf-8');
 //    readfile('osmochat.html');
@@ -94,8 +96,9 @@ function validate_user( $db, $user_id ) {
 function region_where_clause( $lat, $lon, $radius, $field ) {
     $basekm = 6371.0;
     $coslat = cos($lat * M_PI / 180.0);
-    $dlat = ($radius / $basekm) * 180.0 / M_PI;
+    $dlat = ($radius / $basekm);
     $dlon = asin(sin($dlat) / $coslat) * 180.0 / M_PI;
+    $dlat = $dlat * 180.0 / M_PI;
     $minlat = $lat - $dlat;
     $minlon = $lon - $dlon;
     $maxlat = $lat + $dlat;
@@ -118,7 +121,7 @@ function get( $db, $lat, $lon ) {
         error('Failed to update user position: '.$db->error);
 
     $region = region_where_clause($lat, $lon, RADIUS, 'msgpos');
-    $query = "select *, X(msgpos) as lon, Y(msgpos) as lat, unix_timestamp(msgtime) as ts from osmochat where msgid > $last and ((recipient is null and $region) or (recipient = $user_id or author = $user_id)) order by msgid limit 100";
+    $query = "select *, X(msgpos) as lon, Y(msgpos) as lat, unix_timestamp(msgtime) as ts from osmochat where msgid > $last and ((recipient is null and $region) or (recipient = $user_id or author = $user_id)) order by msgid desc limit 30";
     $result = $db->query($query);
     if( !$result )
         error('Database query for messages failed: '.$db->error);
@@ -136,9 +139,9 @@ function get( $db, $lat, $lon ) {
         $item['incoming'] = $data['author'] != $user_id;
         if( !is_null($data['recipient']) ) {
             $item['recipient'] = $data['recipient_name'];
-            $pmsg[] = $item;
+            array_unshift($pmsg, $item);
         } else
-            $msg[] = $item;
+            array_unshift($msg, $item);
     }
     $list['messages'] = $msg;
     $list['private'] = $pmsg;
@@ -158,6 +161,32 @@ function get( $db, $lat, $lon ) {
         $users[] = $item;
     }
     $list['users'] = $users;
+    $result->free();
+
+    print json_encode($list);
+}
+
+// Returns last messages with little extra info (unusable for chatting)
+function get_last( $db ) {
+    $last = req('last', 0);
+    validate_num($last, 'last', false);
+    $list = array();
+
+    $query = "select *, X(msgpos) as lon, Y(msgpos) as lat, unix_timestamp(msgtime) as ts from osmochat where msgid > $last and recipient is null order by msgid desc limit 20";
+    $result = $db->query($query);
+    if( !$result )
+        error('Database query for messages failed: '.$db->error);
+    while( ($data = $result->fetch_assoc()) ) {
+        $item = array();
+        $item['id'] = $data['msgid'];
+        $item['lat'] = $data['lat'];
+        $item['lon'] = $data['lon'];
+        $item['time'] = $data['msgtime'];
+        $item['timestamp'] = $data['ts'];
+        $item['author'] = $data['user_name'];
+        $item['message'] = $data['message'];
+        array_unshift($list, $item);
+    }
     $result->free();
 
     print json_encode($list);
