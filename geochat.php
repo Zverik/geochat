@@ -121,7 +121,7 @@ function get( $db, $lat, $lon ) {
         error('Failed to update user position: '.$db->error);
 
     $region = region_where_clause($lat, $lon, RADIUS, 'msgpos');
-    $query = "select *, X(msgpos) as lon, Y(msgpos) as lat, unix_timestamp(msgtime) as ts from osmochat where msgid > $last and ((recipient is null and $region) or (recipient = $user_id or author = $user_id)) order by msgid desc limit 30";
+    $query = "select *, X(msgpos) as lon, Y(msgpos) as lat, unix_timestamp(msgtime) as ts from osmochat where msgid > $last and ((recipient is null and $region) or recipient = $user_id or (recipient is not null and author = $user_id)) order by msgid desc limit 30";
     $result = $db->query($query);
     if( !$result )
         error('Database query for messages failed: '.$db->error);
