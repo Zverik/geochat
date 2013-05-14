@@ -230,13 +230,24 @@ function register($db, $lat, $lon) {
         if( count($response) < 4 )
             error('Incorrect token');
         $user_name = $db->escape_string($response[1]);
+        $force_user = true;
     } else {
         $user_name = $db->escape_string(req('name'));
+        $force_user = false;
     }
     if( strpos($user_name, ' ') !== FALSE || mb_strlen($user_name, 'UTF8') < 2 || mb_strlen($user_name, 'UTF8') > 100 )
         error('Incorrect user name');
-    if( request_one($db, "select user_id from osmochat_users where user_name = '$user_name'") )
-        error("User $user_name is already logged in, please choose another name");
+    $old_user_id = request_one($db, "select user_id from osmochat_users where user_name = '$user_name'");
+    if( $old_user_id ) {
+        if( !$force_user )
+            error("User $user_name is already logged in, please choose another name");
+        else {
+            // Log out that user
+            $result = $db->query("delete from osmochat_users where user_id = $old_user_id");
+            if( !$result )
+                error('Database error: '.$db->error);
+        }
+    }
     $tries = 0;
     while( !isset($user_id) ) {
         $user_id = mt_rand(1, 2147483647);
