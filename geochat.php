@@ -221,7 +221,18 @@ function post( $db, $lat, $lon ) {
 
 // Register a user. Returns his user_id
 function register($db, $lat, $lon) {
-    $user_name = $db->escape_string(req('name'));
+    $token = req('token', '');
+    if( strlen($token) > 0 ) {
+        if( !preg_match('/^[a-zA-Z0-9]{5,20}$/', $token) )
+            error('Incorrect token format');
+        $response_str = @file_get_contents("http://auth.osmz.ru/get?token=$token");
+        $response = $response_str === false ? array() : explode("\n", $response_str);
+        if( count($response) < 4 )
+            error('Incorrect token');
+        $user_name = $db->escape_string($response[1]);
+    } else {
+        $user_name = $db->escape_string(req('name'));
+    }
     if( strpos($user_name, ' ') !== FALSE || mb_strlen($user_name, 'UTF8') < 2 || mb_strlen($user_name, 'UTF8') > 100 )
         error('Incorrect user name');
     if( request_one($db, "select user_id from osmochat_users where user_name = '$user_name'") )
