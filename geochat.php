@@ -229,7 +229,7 @@ function register($db, $lat, $lon) {
         $response = $response_str === false ? array() : explode("\n", $response_str);
         if( count($response) < 4 )
             error('Incorrect token');
-        $user_name = $db->escape_string($response[1]);
+        $user_name = $db->escape_string(str_replace(' ','_', $response[1]));
         $force_user = true;
     } else {
         $user_name = $db->escape_string(req('name'));
@@ -261,7 +261,7 @@ function register($db, $lat, $lon) {
     $result = $db->query("insert into osmochat_users (user_id, user_name, last_time, last_pos) values($user_id, '$user_name', now(), POINT($lon, $lat))");
     if( !$result )
         error('Database error: '.$db->error);
-    print json_encode(array('message' => 'The user has been registered', 'uid' => $user_id));
+    print json_encode(array('message' => 'The user has been registered', 'uid' => $user_id, 'name' => $user_name));
 }
 
 // Log out a user by user_id
