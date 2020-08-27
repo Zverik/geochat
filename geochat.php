@@ -1,4 +1,4 @@
-<? // GeoChat for OpenStreetMap
+<?php // GeoChat for OpenStreetMap
 
 const RADIUS = 30; // visibility radius in km
 const AGE = 5; // how long in hours keep messages
@@ -103,7 +103,7 @@ function region_where_clause( $lat, $lon, $radius, $field ) {
     $minlon = $lon - $dlon;
     $maxlat = $lat + $dlat;
     $maxlon = $lon + $dlon;
-    $bbox = "GeomFromText('POLYGON(($minlon $minlat, $minlon $maxlat, $maxlon $maxlat, $maxlon $minlat, $minlon $minlat))')";
+    $bbox = "ST_GeomFromText('POLYGON(($minlon $minlat, $minlon $maxlat, $maxlon $maxlat, $maxlon $minlat, $minlon $minlat))')";
     return "MBRContains($bbox, $field)";
 }
 
@@ -121,7 +121,7 @@ function get( $db, $lat, $lon ) {
         error('Failed to update user position: '.$db->error);
 
     $region = region_where_clause($lat, $lon, RADIUS, 'msgpos');
-    $query = "select *, X(msgpos) as lon, Y(msgpos) as lat, unix_timestamp(msgtime) as ts from osmochat where msgid > $last and ((recipient is null and $region) or recipient = $user_id or (recipient is not null and author = $user_id)) order by msgid desc limit 30";
+    $query = "select *, ST_X(msgpos) as lon, ST_Y(msgpos) as lat, unix_timestamp(msgtime) as ts from osmochat where msgid > $last and ((recipient is null and $region) or recipient = $user_id or (recipient is not null and author = $user_id)) order by msgid desc limit 30";
     $result = $db->query($query);
     if( !$result )
         error('Database query for messages failed: '.$db->error);
@@ -148,7 +148,7 @@ function get( $db, $lat, $lon ) {
     $result->free();
 
     $region = region_where_clause($lat, $lon, RADIUS, 'last_pos');
-    $query = "select user_name, X(last_pos) as lon, Y(last_pos) as lat from osmochat_users where user_id != $user_id and $region limit 100";
+    $query = "select user_name, ST_X(last_pos) as lon, ST_Y(last_pos) as lat from osmochat_users where user_id != $user_id and $region limit 100";
     $result = $db->query($query);
     if( !$result )
         error('Database query for users failed: '.$db->error);
@@ -172,7 +172,7 @@ function get_last( $db ) {
     validate_num($last, 'last', false);
     $list = array();
 
-    $query = "select *, X(msgpos) as lon, Y(msgpos) as lat, unix_timestamp(msgtime) as ts from osmochat where msgid > $last and recipient is null order by msgid desc limit 20";
+    $query = "select *, ST_X(msgpos) as lon, ST_Y(msgpos) as lat, unix_timestamp(msgtime) as ts from osmochat where msgid > $last and recipient is null order by msgid desc limit 20";
     $result = $db->query($query);
     if( !$result )
         error('Database query for messages failed: '.$db->error);
